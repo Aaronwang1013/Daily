@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aaron's Daily Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+      --border: #2e3250; --accent: #4f8ef7; --accent2: #7c5cfc;
+      --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+      --text: #e8eaf0; --text2: #8b90a7; --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 32px; background: var(--surface);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .logo-text { font-size: 16px; font-weight: 700; }
+    .logo-sub  { font-size: 11px; color: var(--text2); }
+    #clock { font-size: 22px; font-weight: 300; letter-spacing: 2px; color: var(--text2); }
+
+    main { padding: 24px 28px; max-width: 1600px; margin: 0 auto; }
+    .grid { display: grid; gap: 18px; }
+    .grid-top    { grid-template-columns: 320px 1fr 1fr; }
+    .grid-bottom { grid-template-columns: 1fr 1fr; margin-top: 18px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px; transition: border-color .2s; }
+    .card:hover { border-color: var(--accent); }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .card-title  { font-size: 13px; font-weight: 600; color: var(--text2);
+                   text-transform: uppercase; letter-spacing: 1px;
+                   display: flex; align-items: center; gap: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+    .badge { font-size: 11px; padding: 3px 9px; border-radius: 20px;
+             background: var(--surface2); color: var(--text2); }
+
+    /* AWS */
+    .aws-hero { text-align: center; padding: 8px 0 16px; }
+    .aws-ring { width: 110px; height: 110px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 12px; position: relative; }
+    .aws-ring-inner { text-align: center; }
+    .aws-ring-num   { font-size: 26px; font-weight: 700; color: var(--accent); }
+    .aws-ring-total { font-size: 12px; color: var(--text2); }
+    .aws-title  { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .aws-subtitle { font-size: 12px; color: var(--text2); }
+    .progress-bar  { height: 6px; background: var(--surface2); border-radius: 3px; margin: 14px 0 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; transition: width .6s; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); }
+    .lesson-list { margin-top: 14px; }
+    .lesson-item { display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .lesson-item:last-child { border-bottom: none; }
+    .lesson-status { width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+    .status-done     { background: var(--green); color: #fff; }
+    .status-progress { background: var(--yellow); color: #000; }
+    .status-todo     { background: var(--surface2); color: var(--text2); }
+    .lesson-name { flex: 1; color: var(--text); line-height: 1.3; }
+    .lesson-time { color: var(--text2); white-space: nowrap; }
+    .aws-next-btn { display: block; width: 100%; margin-top: 14px; padding: 10px;
+      border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; text-align: center; text-decoration: none; font-size: 13px;
+      font-weight: 600; cursor: pointer; border: none; transition: opacity .2s; }
+    .aws-next-btn:hover { opacity: .85; }
+
+    /* Calendar */
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cal-month { font-size: 16px; font-weight: 700; }
+    .cal-nav-btn { background: var(--surface2); border: none; color: var(--text);
+      width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 16px; }
+    .cal-nav-btn:hover { background: var(--border); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-day-header { text-align: center; font-size: 11px; color: var(--text2);
+                      padding: 4px 0; font-weight: 600; }
+    .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; font-size: 13px; cursor: pointer; flex-direction: column;
+      gap: 2px; padding-bottom: 4px; transition: background .15s; }
+    .cal-day:hover { background: var(--surface2); }
+    .cal-day.other-month { color: var(--text2); opacity: .4; }
+    .cal-day.today { background: var(--accent); color: #fff; font-weight: 700; }
+    .cal-day.selected { outline: 2px solid var(--accent); }
+    .ev-dots { display: flex; justify-content: center; gap: 2px; }
+    .ev-dot  { width: 5px; height: 5px; border-radius: 50%; }
+    .events-list { margin-top: 10px; }
+    .event-item { display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px; background: var(--surface2); margin-bottom: 6px; font-size: 12px; }
+    .event-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 6px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+    .event-add { width: 100%; margin-top: 10px; padding: 9px; background: var(--surface2);
+      border: 1px dashed var(--border); border-radius: 9px; color: var(--text2);
+      font-size: 12px; cursor: pointer; transition: border-color .2s; }
+    .event-add:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Summary */
+    .summary-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); margin-bottom: 14px; }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .summary-content { background: var(--surface2); border-radius: 10px; padding: 16px;
+      font-size: 13px; line-height: 1.7; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
+    .summary-placeholder { color: var(--text2); font-style: italic; }
+    .summary-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .tag { font-size: 11px; padding: 4px 10px; border-radius: 20px;
+           background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+    /* Quick Links */
+    .links-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .quick-link { display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 14px 10px; border-radius: 10px; background: var(--surface2);
+      text-decoration: none; color: var(--text); font-size: 12px;
+      font-weight: 500; transition: background .2s; text-align: center; }
+    .quick-link:hover { background: var(--border); }
+    .quick-link .icon { font-size: 22px; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 24px; width: 360px; }
+    .modal h3 { font-size: 16px; margin-bottom: 16px; }
+    .modal input, .modal select { width: 100%; padding: 10px 12px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; margin-bottom: 10px; }
+    .modal-btns { display: flex; gap: 10px; margin-top: 6px; }
+    .btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
+    .btn-primary { background: var(--accent); color: #fff; flex: 1; }
+    .btn-cancel  { background: var(--surface2); color: var(--text2); }
+
+    @media (max-width: 1100px) { .grid-top { grid-template-columns: 1fr 1fr; } .grid-bottom { grid-template-columns: 1fr; } }
+    @media (max-width: 700px)  { main { padding: 12px; } .grid-top { grid-template-columns: 1fr; } header { padding: 12px 16px; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🚀</div>
+    <div>
+      <div class="logo-text">Aaron's Dashboard</div>
+      <div class="logo-sub">Daily Command Center</div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div id="clock">--:--:--</div>
+    <div id="date-display" style="font-size:13px;color:var(--text2)">--</div>
+  </div>
+</header>
+
+<main>
+  <div class="grid grid-top">
+
+    <!-- AWS -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:#f59e0b"></span>AWS 學習進度</div>
+        <span class="badge">DEA-C01</span>
+      </div>
+      <div class="aws-hero">
+        <div class="aws-ring" id="awsRing">
+          <div class="aws-ring-inner">
+            <div class="aws-ring-num" id="awsDone">…</div>
+            <div class="aws-ring-total" id="awsTotal">/ …</div>
+          </div>
+        </div>
+        <div class="aws-title">Data Engineer Associate</div>
+        <div class="aws-subtitle">Exam Prep Plan · 17h 15m total</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="awsBar" style="width:0%"></div></div>
+      <div class="progress-label"><span id="awsPct">0%</span><span id="awsRemain">— 模組剩餘</span></div>
+      <div class="lesson-list" id="lessonList"></div>
+      <a class="aws-next-btn" id="awsBtn" href="#" target="_blank">▶ 載入中…</a>
+    </div>
+
+    <!-- Taiwan Market -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:#22c55e"></span>台灣市場</div>
+        <span class="badge" id="tw-time">--</span>
+      </div>
+      <div style="height:280px">
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+        {"colorTheme":"dark","dateRange":"1D","showChart":true,"locale":"zh_TW","isTransparent":true,"showSymbolLogo":false,"showFloatingTooltip":false,"width":"100%","height":"280","tabs":[{"title":"台灣","symbols":[{"s":"TWSE:TAIEX","d":"加權指數"},{"s":"TWSE:0050","d":"元大台灣50"},{"s":"TWSE:2330","d":"台積電"}]}]}
+        </script>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <a href="https://news.cnyes.com/news/cat/tw_stock" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">📰 鉅亨網</a>
+        <a href="https://tw.stock.yahoo.com/tw-market/" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">📊 Yahoo 台股</a>
+        <a href="https://www.moneydj.com" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">💹 MoneyDJ</a>
+      </div>
+    </div>
+
+    <!-- US Market -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:#4f8ef7"></span>美國市場</div>
+        <span class="badge" id="us-time">--</span>
+      </div>
+      <div style="height:280px">
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+        {"colorTheme":"dark","dateRange":"1D","showChart":true,"locale":"zh_TW","isTransparent":true,"showSymbolLogo":false,"showFloatingTooltip":false,"width":"100%","height":"280","tabs":[{"title":"美股","symbols":[{"s":"SP:SPX","d":"S&P 500"},{"s":"NASDAQ:NDX","d":"NASDAQ 100"},{"s":"DJ:DJI","d":"Dow Jones"},{"s":"NASDAQ:NVDA","d":"NVIDIA"},{"s":"NASDAQ:AAPL","d":"Apple"},{"s":"NASDAQ:MSFT","d":"Microsoft"}]}]}
+        </script>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <a href="https://finance.yahoo.com/topic/stock-market-news/" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">📰 Yahoo Finance</a>
+        <a href="https://www.bloomberg.com/markets" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">📊 Bloomberg</a>
+        <a href="https://www.cnbc.com/markets/" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">💹 CNBC</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid grid-bottom">
+
+    <!-- Calendar -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:#7c5cfc"></span>行事曆</div>
+        <a href="https://calendar.google.com" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">Google Calendar ↗</a>
+      </div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+        <div class="cal-month" id="calMonth"></div>
+        <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="legend">
+        <div class="legend-item"><span class="ev-dot" style="background:#ef4444"></span>美股財報</div>
+        <div class="legend-item"><span class="ev-dot" style="background:#f59e0b"></span>台股財報/營收</div>
+        <div class="legend-item"><span class="ev-dot" style="background:#7c5cfc"></span>個人事件</div>
+      </div>
+      <div class="events-list" id="eventsList"></div>
+      <button class="event-add" onclick="openModal()">＋ 新增事件</button>
+    </div>
+
+    <!-- Claude Summary -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:#ef4444"></span>Claude 每日摘要</div>
+        <a href="https://mail.google.com" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">Gmail ↗</a>
+      </div>
+      <div class="summary-meta">
+        <div class="pulse"></div>
+        <span id="summaryDate">載入中…</span>
+      </div>
+      <div class="summary-content" id="summaryContent">
+        <div class="summary-placeholder">📭 尚無每日摘要，Claude 排程任務每晚自動更新。</div>
+      </div>
+      <div class="summary-tags" id="summaryTags"></div>
+      <div style="margin-top:14px;display:flex;gap:10px">
+        <button onclick="loadSummary()" style="flex:1;padding:9px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:12px">🔄 重新整理</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Quick Links -->
+  <div class="card" style="margin-top:18px">
+    <div class="card-header"><div class="card-title"><span class="dot"></span>快速連結</div></div>
+    <div class="links-grid">
+      <a class="quick-link" href="https://skillbuilder.aws/learn" target="_blank"><span class="icon">☁️</span>AWS Skill Builder</a>
+      <a class="quick-link" href="https://mail.google.com" target="_blank"><span class="icon">📧</span>Gmail</a>
+      <a class="quick-link" href="https://calendar.google.com" target="_blank"><span class="icon">📅</span>Google Calendar</a>
+      <a class="quick-link" href="https://finance.yahoo.com" target="_blank"><span class="icon">📊</span>Yahoo Finance</a>
+      <a class="quick-link" href="https://aws.amazon.com/certification/certified-data-engineer-associate/" target="_blank"><span class="icon">🏅</span>DEA-C01 考試</a>
+      <a class="quick-link" href="/docs" target="_blank"><span class="icon">⚙️</span>API Docs</a>
+    </div>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>新增事件</h3>
+    <input type="text" id="evTitle" placeholder="事件名稱" />
+    <input type="date" id="evDate" />
+    <input type="time" id="evTime" placeholder="時間（選填）" />
+    <select id="evColor">
+      <option value="#4f8ef7">🔵 一般</option>
+      <option value="#22c55e">🟢 學習</option>
+      <option value="#f59e0b">🟡 重要</option>
+      <option value="#ef4444">🔴 截止日</option>
+      <option value="#7c5cfc">🟣 個人</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEvent()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';   // same origin
+
+// ── Clock ──
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('zh-TW', {hour12:false});
+  document.getElementById('date-display').textContent =
+    now.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  const twT = now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Taipei'});
+  const usT = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/New_York'});
+  document.getElementById('tw-time').textContent = '台北 ' + twT;
+  document.getElementById('us-time').textContent = 'NY ' + usT;
+}
+setInterval(tick, 1000); tick();
+
+// ── AWS ──
+async function loadAWS() {
+  try {
+    const d = await fetch(API + '/api/aws').then(r => r.json());
+    const pct = Math.round(d.done / d.total * 100);
+    document.getElementById('awsDone').textContent = d.done;
+    document.getElementById('awsTotal').textContent = '/ ' + d.total;
+    document.getElementById('awsBar').style.width = pct + '%';
+    document.getElementById('awsPct').textContent = pct + '%';
+    document.getElementById('awsRemain').textContent = (d.total - d.done) + ' 模組剩餘';
+    const btn = document.getElementById('awsBtn');
+    btn.textContent = '▶ 繼續 ' + d.current_lesson;
+    btn.href = d.resume_url;
+    // Ring
+    const ring = document.getElementById('awsRing');
+    ring.style.background = `conic-gradient(var(--accent) ${pct*3.6}deg, var(--surface2) ${pct*3.6}deg)`;
+    ring.style.borderRadius = '50%';
+    ring.style.padding = '10px';
+    // Lessons
+    const lessons = d.lessons || [];
+    document.getElementById('lessonList').innerHTML = lessons.slice(0, 10).map(l => `
+      <div class="lesson-item">
+        <div class="lesson-status ${l.status==='done'?'status-done':l.status==='progress'?'status-progress':'status-todo'}">
+          ${l.status==='done'?'✓':l.status==='progress'?'▶':'○'}
+        </div>
+        <div class="lesson-name">${l.name}</div>
+        <div class="lesson-time">${l.time}</div>
+      </div>`).join('');
+  } catch(e) { console.error('AWS load failed', e); }
+}
+loadAWS();
+
+// ── Calendar state ──
+let calDate = new Date();
+let selectedDate = new Date().toISOString().split('T')[0];
+let earningsCache = [];
+let personalCache = [];
+
+async function loadEarnings() {
+  try { earningsCache = await fetch(API + '/api/calendar/earnings').then(r => r.json()); }
+  catch(e) { earningsCache = []; }
+}
+
+async function loadPersonalEvents(date) {
+  try { personalCache = await fetch(API + '/api/calendar/events').then(r => r.json()); }
+  catch(e) { personalCache = []; }
+}
+
+function eventsOn(dateStr) {
+  return [
+    ...earningsCache.filter(e => e.date === dateStr).map(e => ({...e, isEarnings:true})),
+    ...personalCache.filter(e => e.date === dateStr).map(e => ({...e, isEarnings:false})),
+  ];
+}
+
+function renderCalendar() {
+  const year = calDate.getFullYear(), month = calDate.getMonth();
+  const today = new Date();
+  document.getElementById('calMonth').textContent =
+    calDate.toLocaleDateString('zh-TW', {year:'numeric', month:'long'});
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = ['日','一','二','三','四','五','六']
+    .map(d => `<div class="cal-day-header">${d}</div>`).join('');
+
+  const firstDow = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month+1, 0).getDate();
+
+  for (let i = 0; i < firstDow; i++) {
+    const d = new Date(year, month, -firstDow+i+1);
+    grid.innerHTML += `<div class="cal-day other-month">${d.getDate()}</div>`;
+  }
+  for (let d = 1; d <= lastDate; d++) {
+    const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = d===today.getDate() && month===today.getMonth() && year===today.getFullYear();
+    const isSel   = ds === selectedDate;
+    const evs = eventsOn(ds);
+    const hasUs = evs.some(e => e.market==='us');
+    const hasTw = evs.some(e => e.market==='tw');
+    const hasPer= evs.some(e => !e.market);
+    let dots = '';
+    if (hasUs)  dots += `<span class="ev-dot" style="background:#ef4444"></span>`;
+    if (hasTw)  dots += `<span class="ev-dot" style="background:#f59e0b"></span>`;
+    if (hasPer) dots += `<span class="ev-dot" style="background:#7c5cfc"></span>`;
+    grid.innerHTML += `
+      <div class="cal-day ${isToday?'today':''} ${isSel&&!isToday?'selected':''}"
+           onclick="selectDay('${ds}')">
+        <span>${d}</span>
+        ${dots ? `<div class="ev-dots">${dots}</div>` : ''}
+      </div>`;
+  }
+  renderEvents();
+}
+
+function selectDay(ds) {
+  selectedDate = ds;
+  document.getElementById('evDate').value = ds;
+  renderCalendar();
+}
+
+function renderEvents() {
+  const evs = eventsOn(selectedDate);
+  const list = document.getElementById('eventsList');
+  if (!evs.length) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text2);padding:10px 0">${selectedDate} 沒有事件</div>`;
+    return;
+  }
+  list.innerHTML = evs.map(e => `
+    <div class="event-item">
+      <div class="event-dot" style="background:${e.color}"></div>
+      ${e.isEarnings
+        ? `<div style="flex:1"><span style="font-size:10px;color:var(--text2);background:var(--surface);padding:1px 6px;border-radius:4px;margin-right:6px">${e.market==='us'?'🇺🇸 美股':'🇹🇼 台股'}</span><b>${e.title}</b></div>`
+        : `<div style="flex:1"><b>${e.title}</b>${e.time?' · '+e.time:''}</div>
+           <button onclick="deleteEvent(${e.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px">×</button>`
+      }
+    </div>`).join('');
+}
+
+async function deleteEvent(id) {
+  if (!confirm('確定刪除？')) return;
+  await fetch(API + '/api/calendar/events/' + id, {method:'DELETE'});
+  await loadPersonalEvents();
+  renderCalendar();
+}
+
+function changeMonth(dir) { calDate.setMonth(calDate.getMonth()+dir); renderCalendar(); }
+function openModal()  { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+async function saveEvent() {
+  const title = document.getElementById('evTitle').value.trim();
+  const date  = document.getElementById('evDate').value;
+  const time  = document.getElementById('evTime').value;
+  const color = document.getElementById('evColor').value;
+  if (!title || !date) { alert('請填入名稱與日期'); return; }
+  await fetch(API + '/api/calendar/events', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({title, date, time, color, event_type:'personal'})
+  });
+  closeModal();
+  document.getElementById('evTitle').value = '';
+  document.getElementById('evTime').value  = '';
+  await loadPersonalEvents();
+  renderCalendar();
+}
+
+// ── Summary ──
+async function loadSummary() {
+  try {
+    const d = await fetch(API + '/api/summary/latest').then(r => r.json());
+    const el   = document.getElementById('summaryContent');
+    const dateEl = document.getElementById('summaryDate');
+    const tagsEl = document.getElementById('summaryTags');
+    if (d.content) {
+      el.textContent = d.content;
+      dateEl.textContent = '最後更新：' + d.summary_date;
+      tagsEl.innerHTML = (d.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('');
+    } else {
+      el.innerHTML = '<div class="summary-placeholder">📭 尚無每日摘要，Claude 排程任務每晚自動更新。</div>';
+      dateEl.textContent = '尚未更新';
+      tagsEl.innerHTML = '';
+    }
+  } catch(e) { console.error('Summary load failed', e); }
+}
+
+// ── Init ──
+async function init() {
+  await Promise.all([loadEarnings(), loadPersonalEvents()]);
+  renderCalendar();
+  loadSummary();
+}
+init();
+</script>
+</body>
+</html>
