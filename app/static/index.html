@@ -138,6 +138,32 @@
     .btn-primary { background: var(--accent); color: #fff; flex: 1; }
     .btn-cancel  { background: var(--surface2); color: var(--text2); }
 
+    /* Financial News */
+    .news-list { display: flex; flex-direction: column; gap: 8px; }
+    .news-item { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+      border-radius: 10px; background: var(--surface2); border-left: 3px solid var(--border); transition: border-color .2s; }
+    .news-item:hover { border-left-color: var(--accent); }
+    .news-item.market-tw     { border-left-color: var(--green); }
+    .news-item.market-us     { border-left-color: var(--accent); }
+    .news-item.market-global { border-left-color: var(--yellow); }
+    .news-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); }
+    .news-source-badge { padding: 2px 7px; border-radius: 20px; background: var(--surface);
+      color: var(--text2); font-size: 10px; white-space: nowrap; }
+    .news-title { font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--text); }
+    .news-title a { color: var(--text); text-decoration: none; }
+    .news-title a:hover { color: var(--accent); }
+    .news-digest { background: var(--surface2); border-radius: 10px; padding: 14px 16px;
+      font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-wrap;
+      border: 1px solid var(--border); margin-bottom: 12px; }
+    .news-digest-label { font-size: 11px; color: var(--text2); margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px; }
+    .news-filter-tabs { display: flex; gap: 6px; }
+    .news-tab { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text2); transition: all .15s; }
+    .news-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .news-empty { font-size: 12px; color: var(--text2); padding: 20px 0; text-align: center; }
+
     @media (max-width: 1100px) { .grid-top { grid-template-columns: 1fr 1fr; } .grid-bottom { grid-template-columns: 1fr; } }
     @media (max-width: 700px)  { main { padding: 12px; } .grid-top { grid-template-columns: 1fr; } header { padding: 12px 16px; } }
   </style>
@@ -277,6 +303,30 @@
       <a class="quick-link" href="/docs" target="_blank"><span class="icon">⚙️</span>API Docs</a>
     </div>
   </div>
+
+  <!-- Financial News -->
+  <div class="card" style="margin-top:18px" id="newsCard">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--yellow)"></span>財經重點</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="news-filter-tabs">
+          <button class="news-tab active" onclick="filterNews('all',this)">全部</button>
+          <button class="news-tab" onclick="filterNews('tw',this)">台股</button>
+          <button class="news-tab" onclick="filterNews('us',this)">美股</button>
+          <button class="news-tab" onclick="filterNews('global',this)">國際</button>
+        </div>
+        <button onclick="triggerNewsFetch()" id="newsRefreshBtn"
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+                 border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">↻ 更新</button>
+      </div>
+    </div>
+    <div id="newsDigestBlock" style="display:none">
+      <div class="news-digest-label"><div class="pulse"></div>Claude 今日財經摘要</div>
+      <div class="news-digest" id="newsDigestText"></div>
+    </div>
+    <div class="news-list" id="newsList"><div class="news-empty">⏳ 載入中…</div></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text2);text-align:right" id="newsFooter"></div>
+  </div>
 </main>
 
 <!-- Modal -->
@@ -347,6 +397,29 @@ async function loadAWS() {
   } catch(e) { console.error('AWS load failed', e); }
 }
 loadAWS();
+
+// ── Company logo mapping (ticker → domain) ──
+const TICKER_META = {
+  'JPM':  { domain: 'jpmorganchase.com', name: 'JPMorgan' },
+  'GS':   { domain: 'goldmansachs.com',  name: 'Goldman Sachs' },
+  'NFLX': { domain: 'netflix.com',       name: 'Netflix' },
+  'TSM':  { domain: 'tsmc.com',          name: 'TSMC ADR' },
+  '2330': { domain: 'tsmc.com',          name: '台積電' },
+  'GOOGL':{ domain: 'google.com',        name: 'Alphabet' },
+  'META': { domain: 'meta.com',          name: 'Meta' },
+  'MSFT': { domain: 'microsoft.com',     name: 'Microsoft' },
+  'AMZN': { domain: 'amazon.com',        name: 'Amazon' },
+  'AAPL': { domain: 'apple.com',         name: 'Apple' },
+  'NVDA': { domain: 'nvidia.com',        name: 'NVIDIA' },
+  'AMD':  { domain: 'amd.com',           name: 'AMD' },
+  'TSLA': { domain: 'tesla.com',         name: 'Tesla' },
+  'BABA': { domain: 'alibaba.com',       name: 'Alibaba' },
+};
+
+function getLogoUrl(ticker) {
+  const meta = ticker && TICKER_META[ticker];
+  return meta ? `https://logo.clearbit.com/${meta.domain}` : null;
+}
 
 // ── Calendar state ──
 let calDate = new Date();
@@ -422,15 +495,36 @@ function renderEvents() {
     list.innerHTML = `<div style="font-size:12px;color:var(--text2);padding:10px 0">${selectedDate} 沒有事件</div>`;
     return;
   }
-  list.innerHTML = evs.map(e => `
-    <div class="event-item">
-      <div class="event-dot" style="background:${e.color}"></div>
-      ${e.isEarnings
-        ? `<div style="flex:1"><span style="font-size:10px;color:var(--text2);background:var(--surface);padding:1px 6px;border-radius:4px;margin-right:6px">${e.market==='us'?'🇺🇸 美股':'🇹🇼 台股'}</span><b>${e.title}</b></div>`
-        : `<div style="flex:1"><b>${e.title}</b>${e.time?' · '+e.time:''}</div>
-           <button onclick="deleteEvent(${e.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px">×</button>`
-      }
-    </div>`).join('');
+  list.innerHTML = evs.map(e => {
+    if (e.isEarnings) {
+      const logoUrl  = getLogoUrl(e.ticker);
+      const flag     = e.market === 'us' ? '🇺🇸' : '🇹🇼';
+      const logoHtml = logoUrl
+        ? `<img src="${logoUrl}" alt="${e.ticker}"
+               style="width:24px;height:24px;border-radius:6px;object-fit:contain;background:#fff;padding:2px;flex-shrink:0"
+               onerror="this.style.display='none';this.nextSibling.style.display='flex'"
+           /><div style="display:none;width:24px;height:24px;border-radius:6px;background:${e.color};align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${(e.ticker||'?').slice(0,2)}</div>`
+        : `<div style="width:24px;height:24px;border-radius:6px;background:${e.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${flag}</div>`;
+      return `
+        <div class="event-item" style="gap:10px">
+          ${logoHtml}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span style="font-size:10px;color:var(--text2);background:var(--surface);padding:1px 6px;border-radius:4px;white-space:nowrap">${flag} ${e.market==='us'?'美股':'台股'}</span>
+              ${e.ticker ? `<span style="font-size:10px;font-weight:700;color:${e.color}">${e.ticker}</span>` : ''}
+            </div>
+            <div style="font-size:12px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title}</div>
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div class="event-item">
+          <div class="event-dot" style="background:${e.color}"></div>
+          <div style="flex:1"><b>${e.title}</b>${e.time ? ' · ' + e.time : ''}</div>
+          <button onclick="deleteEvent(${e.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px">×</button>
+        </div>`;
+    }
+  }).join('');
 }
 
 async function deleteEvent(id) {
@@ -481,9 +575,94 @@ async function loadSummary() {
   } catch(e) { console.error('Summary load failed', e); }
 }
 
+// ── Financial News ──
+const SOURCE_NAMES = {
+  cnyes_tw: '鉅亨台股', cnyes_us: '鉅亨美股',
+  yahoo_tw: 'Yahoo TW', reuters_markets: 'Reuters', ftchinese: 'FT中文',
+};
+let newsCache = [];
+let newsFilter = 'all';
+
+async function loadNews() {
+  try {
+    let data = await fetch(API + '/api/news/today?limit=20').then(r => r.json());
+    if (!data.length) data = await fetch(API + '/api/news/latest?limit=15').then(r => r.json());
+    newsCache = data;
+    renderNews();
+  } catch(e) {
+    document.getElementById('newsList').innerHTML = '<div class="news-empty">無法載入財經新聞</div>';
+  }
+}
+
+function filterNews(market, btn) {
+  newsFilter = market;
+  document.querySelectorAll('.news-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderNews();
+}
+
+function renderNews() {
+  const items = newsFilter === 'all' ? newsCache : newsCache.filter(n => n.market === newsFilter);
+  const list = document.getElementById('newsList');
+  const digestBlock = document.getElementById('newsDigestBlock');
+  const digestText  = document.getElementById('newsDigestText');
+  const footer      = document.getElementById('newsFooter');
+
+  const withDigest = newsCache.find(n => n.summary);
+  if (withDigest) {
+    digestText.textContent = withDigest.summary;
+    digestBlock.style.display = 'block';
+  } else {
+    digestBlock.style.display = 'none';
+  }
+
+  if (!items.length) {
+    list.innerHTML = '<div class="news-empty">今日暫無財經新聞，排程將於每日 08:00 自動抓取<br>可點右上角「↻ 更新」手動觸發</div>';
+    footer.textContent = '';
+    return;
+  }
+
+  const mFlag = { tw: '🇹🇼', us: '🇺🇸', global: '🌐' };
+  list.innerHTML = items.slice(0, 15).map(n => {
+    const cls = n.market ? `market-${n.market}` : '';
+    const src = SOURCE_NAMES[n.source] || n.source;
+    const flag = mFlag[n.market] || '📰';
+    const tagsHtml = (n.tags||[]).slice(0,2).map(t =>
+      `<span class="tag" style="font-size:10px;padding:1px 7px">${t}</span>`).join('');
+    return `
+      <div class="news-item ${cls}">
+        <div class="news-meta">
+          <span class="news-source-badge">${flag} ${src}</span>
+          <span>${n.published_date}</span>
+          ${tagsHtml}
+        </div>
+        <div class="news-title"><a href="${n.url}" target="_blank" rel="noopener">${n.title}</a></div>
+      </div>`;
+  }).join('');
+
+  footer.textContent = `共 ${items.length} 則 · ${items[0]?.published_date || ''}`;
+}
+
+async function triggerNewsFetch() {
+  const btn = document.getElementById('newsRefreshBtn');
+  btn.textContent = '⏳ 抓取中…';
+  btn.disabled = true;
+  try {
+    await fetch(API + '/api/news/fetch', { method: 'POST' });
+    setTimeout(async () => {
+      await loadNews();
+      btn.textContent = '↻ 更新';
+      btn.disabled = false;
+    }, 4000);
+  } catch(e) {
+    btn.textContent = '↻ 更新';
+    btn.disabled = false;
+  }
+}
+
 // ── Init ──
 async function init() {
-  await Promise.all([loadEarnings(), loadPersonalEvents()]);
+  await Promise.all([loadEarnings(), loadPersonalEvents(), loadNews()]);
   renderCalendar();
   loadSummary();
 }

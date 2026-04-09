@@ -42,3 +42,17 @@ class AWSProgress(Base):
     resume_url     = Column(Text, default="")
     lessons        = Column(JSON, default=list)
     updated_at     = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FinancialNews(Base):
+    __tablename__ = "financial_news"
+    id             = Column(Integer, primary_key=True, index=True)
+    source         = Column(String(100), nullable=False)
+    title          = Column(String(500), nullable=False)
+    url            = Column(String(1000), nullable=False, unique=True)
+    raw_content    = Column(Text, nullable=True)
+    summary        = Column(Text, nullable=True)
+    published_date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    market         = Column(String(5), nullable=True)                # "tw" | "us" | "global"
+    tags           = Column(JSON, default=list)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
