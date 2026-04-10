@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 import pytz
 
 from .database import engine, Base
-from .routers import aws, calendar, summary, news
+from .routers import aws, calendar, summary, news, investment
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,25 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         misfire_grace_time=3600,
     )
+
+    # Seed default watchlist and schedule stock data refresh
+    from .services.stock_fetcher import seed_default_watchlist, run_stock_refresh
+    seed_default_watchlist()
+    scheduler.add_job(
+        run_stock_refresh,
+        trigger=CronTrigger(
+            day_of_week="mon-fri",
+            hour="9,10,11,12,13,14,15,16,21,22,23",
+            minute=0,
+            timezone=pytz.timezone("Asia/Taipei"),
+        ),
+        id="stock_refresh",
+        replace_existing=True,
+        misfire_grace_time=900,
+    )
+
     scheduler.start()
-    logger.info("APScheduler started — daily RSS fetch at 08:00 Asia/Taipei")
+    logger.info("APScheduler started — daily RSS fetch at 08:00 Asia/Taipei, stock refresh on weekdays")
 
     yield
 
@@ -50,6 +67,7 @@ app.include_router(aws.router)
 app.include_router(calendar.router)
 app.include_router(summary.router)
 app.include_router(news.router)
+app.include_router(investment.router)
 
 # ── Serve static frontend ──
 static_dir = os.path.join(os.path.dirname(__file__), "static")

@@ -56,3 +56,58 @@ class FinancialNews(Base):
     market         = Column(String(5), nullable=True)                # "tw" | "us" | "global"
     tags           = Column(JSON, default=list)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Investment Research Models ──
+
+class WatchlistStock(Base):
+    __tablename__ = "watchlist_stocks"
+    id                      = Column(Integer, primary_key=True, index=True)
+    ticker                  = Column(String(20), nullable=False, unique=True)
+    # Auto-fetched fields (refreshed by scheduler)
+    price                   = Column(String(20), nullable=True)
+    forward_pe              = Column(String(20), nullable=True)
+    peg_ratio               = Column(String(20), nullable=True)
+    analyst_target          = Column(String(20), nullable=True)
+    week_change             = Column(String(20), nullable=True)   # e.g. "+3.21" (%)
+    # Manual overrides (NULL = use auto value)
+    price_override          = Column(String(20), nullable=True)
+    forward_pe_override     = Column(String(20), nullable=True)
+    peg_ratio_override      = Column(String(20), nullable=True)
+    analyst_target_override = Column(String(20), nullable=True)
+    notes                   = Column(Text, nullable=True)
+    last_fetched            = Column(DateTime(timezone=True), nullable=True)
+    created_at              = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ResearchTask(Base):
+    __tablename__ = "research_tasks"
+    id         = Column(Integer, primary_key=True, index=True)
+    text       = Column(String(500), nullable=False)
+    ticker_tag = Column(String(20), nullable=True)
+    task_type  = Column(String(10), nullable=False, default="daily")  # daily | weekly | monthly
+    done       = Column(Integer, default=0)   # 0/1
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndustrySignal(Base):
+    __tablename__ = "industry_signals"
+    id         = Column(Integer, primary_key=True, index=True)
+    note       = Column(String(1000), nullable=False)
+    category   = Column(String(30), nullable=False, default="other")
+    # upstream_capex | supply_chain | earnings | other
+    sentiment  = Column(String(10), nullable=False, default="neutral")
+    # positive | negative | neutral
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ValuationNote(Base):
+    __tablename__ = "valuation_notes"
+    id         = Column(Integer, primary_key=True, index=True)
+    ticker     = Column(String(20), nullable=False, index=True)
+    price      = Column(String(20), nullable=True)
+    forward_pe = Column(String(20), nullable=True)
+    peg_ratio  = Column(String(20), nullable=True)
+    judgment   = Column(Text, nullable=True)   # personal analysis
+    note_date  = Column(String(10), nullable=False)  # YYYY-MM-DD
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
