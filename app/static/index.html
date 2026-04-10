@@ -193,6 +193,17 @@
     .stock-remove  { position: absolute; top: 10px; right: 10px; background: none; border: none;
       color: var(--text2); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; }
     .stock-remove:hover { color: var(--red); }
+    .ticker-autocomplete { position: relative; flex: 1; }
+    .ticker-autocomplete input { width: 100%; }
+    .ticker-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4); overflow: hidden; display: none; }
+    .ticker-dropdown.open { display: block; }
+    .ticker-option { padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+      font-size: 13px; transition: background .1s; }
+    .ticker-option:hover, .ticker-option.active { background: var(--surface2); }
+    .ticker-option-sym { font-weight: 800; color: var(--accent); min-width: 56px; font-size: 13px; }
+    .ticker-option-name { color: var(--text2); font-size: 12px; }
     .peg-green  { color: var(--green); }
     .peg-yellow { color: var(--yellow); }
     .peg-red    { color: var(--red); }
@@ -471,8 +482,15 @@
         </div>
       </div>
       <div class="watchlist-add">
-        <input type="text" id="newTickerInput" placeholder="Add ticker (e.g. NVDA)"
-               style="text-transform:uppercase" onkeydown="if(event.key==='Enter')addStock()" />
+        <div class="ticker-autocomplete">
+          <input type="text" id="newTickerInput" placeholder="Add ticker (e.g. NVDA)"
+                 style="text-transform:uppercase"
+                 oninput="onTickerInput()"
+                 onkeydown="onTickerKeydown(event)"
+                 onblur="setTimeout(()=>closeTickerDropdown(),200)"
+                 autocomplete="off" />
+          <div class="ticker-dropdown" id="tickerDropdown"></div>
+        </div>
         <button onclick="addStock()">+ Add</button>
       </div>
       <div class="stock-cards" id="stockCards">
@@ -931,6 +949,89 @@ function eff(override, auto) {
 function fmtDt(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Ticker Autocomplete ──
+let acActiveIdx = -1;
+let acDebounceTimer = null;
+
+function onTickerInput() {
+  const val = document.getElementById('newTickerInput').value.trim();
+  acActiveIdx = -1;
+  clearTimeout(acDebounceTimer);
+  if (!val) { closeTickerDropdown(); return; }
+
+  // Show loading state immediately
+  const dd = document.getElementById('tickerDropdown');
+  dd.innerHTML = '<div class="ticker-option" style="color:var(--text2);cursor:default">搜尋中…</div>';
+  dd.classList.add('open');
+
+  acDebounceTimer = setTimeout(() => fetchTickerSuggestions(val), 250);
+}
+
+async function fetchTickerSuggestions(q) {
+  const dd = document.getElementById('tickerDropdown');
+  try {
+    const results = await fetch(API + '/api/investment/search?q=' + encodeURIComponent(q)).then(r => r.json());
+    if (!results.length) {
+      dd.innerHTML = '<div class="ticker-option" style="color:var(--text2);cursor:default">找不到符合的代碼</div>';
+      dd.classList.add('open');
+      return;
+    }
+    dd.innerHTML = results.map(r => {
+      const typeTag = r.type === 'ETF'
+        ? '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#2e1a4a;color:#a855f7;margin-left:4px">ETF</span>'
+        : '';
+      return `<div class="ticker-option" data-sym="${r.ticker}" onmousedown="selectTicker('${r.ticker}')">
+        <span class="ticker-option-sym">${r.ticker}</span>
+        <span class="ticker-option-name">${r.name}</span>${typeTag}
+      </div>`;
+    }).join('');
+    dd.classList.add('open');
+    acActiveIdx = -1;
+  } catch(e) {
+    dd.innerHTML = '<div class="ticker-option" style="color:var(--red);cursor:default">搜尋失敗</div>';
+  }
+}
+
+function onTickerKeydown(e) {
+  const dd = document.getElementById('tickerDropdown');
+  const opts = dd.querySelectorAll('.ticker-option[data-sym]');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acActiveIdx = Math.min(acActiveIdx + 1, opts.length - 1);
+    opts.forEach((o, i) => o.classList.toggle('active', i === acActiveIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acActiveIdx = Math.max(acActiveIdx - 1, -1);
+    opts.forEach((o, i) => o.classList.toggle('active', i === acActiveIdx));
+  } else if (e.key === 'Enter') {
+    if (acActiveIdx >= 0 && opts[acActiveIdx]) {
+      e.preventDefault();
+      selectTicker(opts[acActiveIdx].dataset.sym);
+    } else {
+      clearTimeout(acDebounceTimer);
+      closeTickerDropdown();
+      addStock();
+    }
+  } else if (e.key === 'Escape') {
+    clearTimeout(acDebounceTimer);
+    closeTickerDropdown();
+  }
+}
+
+function selectTicker(sym) {
+  clearTimeout(acDebounceTimer);
+  document.getElementById('newTickerInput').value = sym;
+  closeTickerDropdown();
+  addStock();
+}
+
+function closeTickerDropdown() {
+  const dd = document.getElementById('tickerDropdown');
+  dd.classList.remove('open');
+  dd.innerHTML = '';
+  acActiveIdx = -1;
 }
 
 // ── Watchlist ──

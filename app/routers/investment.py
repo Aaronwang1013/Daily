@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -106,6 +106,36 @@ class ValuationNoteCreate(BaseModel):
     peg_ratio: Optional[str] = None
     judgment: Optional[str] = None
     note_date: Optional[str] = None   # defaults to today if omitted
+
+
+# ─────────────────────────────────────────
+# Ticker Search (Yahoo Finance proxy)
+# ─────────────────────────────────────────
+
+@router.get("/search")
+async def search_tickers(q: str = Query(..., min_length=1)):
+    """Proxy to Yahoo Finance quote search. Returns list of {ticker, name, type}."""
+    import httpx
+    url = (
+        "https://query2.finance.yahoo.com/v1/finance/search"
+        f"?q={q}&quotes_count=10&news_count=0&enableFuzzyQuery=false"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            data = resp.json()
+        quotes = data.get("quotes", [])
+        return [
+            {
+                "ticker": item["symbol"],
+                "name": item.get("shortname") or item.get("longname") or "",
+                "type": item.get("quoteType", ""),
+            }
+            for item in quotes
+            if item.get("symbol") and item.get("quoteType") in ("EQUITY", "ETF", "INDEX")
+        ]
+    except Exception:
+        return []
 
 
 # ─────────────────────────────────────────
